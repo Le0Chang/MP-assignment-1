@@ -6,9 +6,9 @@
 
 ## AI/LLM Usage
 
-- LLM Model: (e.g., OpenAI GPT-4o, Google Gemini 2.5 Pro, etc.)
-- Programming Environment: (e.g., Visual Studio Code, Cursor, etc.)
-- Helped With: (e.g., Part 1, Part 2)
+- LLM Model: Doubao 10.0.0
+- Programming Environment: Visual Studio Code（codespace from Github）
+- Helped With: (Part 1, Part 2 and Part 3)
 - Interesting Prompt/Responses: (e.g., "Please help me complete the algorithm...")
 
 > Feel free to extensively document your prompt and responses; what works and what not?

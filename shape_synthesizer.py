@@ -37,6 +37,7 @@ class ShapeSynthesizer(BottomUpSynthesizer[Shape]):
         
         return shapes
     
+    '''
     def grow(self, program_list: List[Shape], examples: List[Any]) -> List[Shape]:
         """Grow the program list by one level using all possible operations"""
         
@@ -54,6 +55,33 @@ class ShapeSynthesizer(BottomUpSynthesizer[Shape]):
         new_programs = []
         
         return new_programs
+    '''
+
+    def grow(self, program_list: List[Shape], examples: List[Any]) -> List[Shape]:
+        """Grow the program list by one level using all possible operations"""
+        # 保留原始程序（基础形状和已生成的复合形状）
+        new_programs = list(program_list)  # 初始包含当前所有程序
+
+        # 1. 应用单目操作：Mirror（对每个程序生成镜像）
+        for p in program_list:
+            new_programs.append(Mirror(p))
+
+        # 2. 应用双目操作：Union、Intersection、Subtraction（对所有程序对组合）
+        # 遍历所有可能的程序对（包括自身与自身的组合）
+        for i in range(len(program_list)):
+            p1 = program_list[i]
+            for j in range(len(program_list)):
+                p2 = program_list[j]
+                # 生成三种双目操作的新程序
+                new_programs.append(Union(p1, p2))
+                new_programs.append(Intersection(p1, p2))
+                new_programs.append(Subtraction(p1, p2))  # p1 减去 p2 的部分
+
+        # 3. 去重：通过转换为集合再转回列表（依赖 Shape 类实现 __eq__ 和 __hash__）
+        # 若 Shape 未实现，则需手动遍历去重（此处假设已实现）
+        unique_programs = list(set(new_programs))
+
+        return unique_programs    
     
     def is_correct(self, program: Shape, examples: List[Tuple[float, float, bool]]) -> bool:
         """Check if a program produces the expected output on all examples"""
@@ -73,6 +101,7 @@ class ShapeSynthesizer(BottomUpSynthesizer[Shape]):
         ys = np.array([ex[1] for ex in examples])
         return [(xs, ys)]
 
+    '''
     def compute_signature(self, program: Shape, test_inputs: List[Tuple[np.ndarray, np.ndarray]]) -> Any:
         """Compute a signature for a geometric shape on test inputs for equivalence checking"""
         try:
@@ -80,3 +109,10 @@ class ShapeSynthesizer(BottomUpSynthesizer[Shape]):
             return tuple(program.interpret(xs, ys))
         except Exception:
             return None # Indicate failure to interpret
+    '''
+
+    # 在compute_signature中复用缓存（避免重复调用interpret），优化运行时间
+    def compute_signature(self, program: Shape, test_inputs: List[Any]) -> Any:
+        xs, ys = test_inputs[0]
+        # 直接计算并返回，依赖外部缓存（在eliminate_equivalents中维护）
+        return tuple(program.interpret(xs, ys))

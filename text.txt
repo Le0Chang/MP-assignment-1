@@ -5,7 +5,7 @@ source .venv/bin/activate
 1. 查看修改文件
 git status # 确认需同步的修改文件（红色为未跟踪 / 修改，绿色为已暂存）
 2. 暂存修改文件
-git add + 文件名
+git add + 文件名1 文件名2
 3. 提交修改到本地分支（代码空间内）
 git commit -m "提交描述"
 4. 推送提交到远程仓库的 main 分支

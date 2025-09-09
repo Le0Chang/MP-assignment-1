@@ -60,11 +60,13 @@ class ShapeSynthesizer(BottomUpSynthesizer[Shape]):
     def grow(self, program_list: List[Shape], examples: List[Any]) -> List[Shape]:
         """Grow the program list by one level using all possible operations"""
         # 保留原始程序（基础形状和已生成的复合形状）
-        new_programs = list(program_list)  # 初始包含当前所有程序
+        new_programs = set(program_list)  
+        # new_programs = list(program_list) # 初始包含当前所有程序
 
         # 1. 应用单目操作：Mirror（对每个程序生成镜像）
         for p in program_list:
-            new_programs.append(Mirror(p))
+            new_programs.add(Mirror(p))
+            # new_programs.append(Mirror(p))
 
         # 2. 应用双目操作：Union、Intersection、Subtraction（对所有程序对组合）
         # 遍历所有可能的程序对（包括自身与自身的组合）
@@ -73,13 +75,17 @@ class ShapeSynthesizer(BottomUpSynthesizer[Shape]):
             for j in range(len(program_list)):
                 p2 = program_list[j]
                 # 生成三种双目操作的新程序
-                new_programs.append(Union(p1, p2))
-                new_programs.append(Intersection(p1, p2))
-                new_programs.append(Subtraction(p1, p2))  # p1 减去 p2 的部分
+                new_programs.add(Union(p1, p2))
+                new_programs.add(Intersection(p1, p2))
+                new_programs.add(Subtraction(p1, p2))  # p1 减去 p2 的部分
+                # new_programs.append(Union(p1, p2))
+                # new_programs.append(Intersection(p1, p2))
+                # new_programs.append(Subtraction(p1, p2))  # p1 减去 p2 的部分
 
         # 3. 去重：通过转换为集合再转回列表（依赖 Shape 类实现 __eq__ 和 __hash__）
         # 若 Shape 未实现，则需手动遍历去重（此处假设已实现）
-        unique_programs = list(set(new_programs))
+        unique_programs = list(new_programs)
+        # unique_programs = list(set(new_programs))
 
         return unique_programs    
     

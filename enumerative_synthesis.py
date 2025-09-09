@@ -9,6 +9,7 @@ from typing import List, Tuple, Dict, Any, TypeVar, Generic, Generator
 import numpy as np
 from tqdm import tqdm
 
+
 T = TypeVar('T')  # Generic type for a DSL expression
 
 class BottomUpSynthesizer(ABC, Generic[T]):
@@ -61,59 +62,51 @@ class BottomUpSynthesizer(ABC, Generic[T]):
         raise ValueError(f"No program found within {max_iterations} iterations")
     '''
 
-    def synthesize(self, examples: List[Any], max_iterations: int = 5) -> T:
+    def synthesize(self, examples: List[Any], max_iterations: int = 5, accumulate_programs: bool = False) -> T:
         """
-        Main synthesis algorithm using bottom-up enumeration
-    
-        Args:
-            examples: List of input-output examples
-            max_iterations: Maximum number of growth iterations
+        增强版合成算法：支持累积程序集（适配 Part2 组合需求），默认关闭（适配 Part1）
         
-        Returns:
-            A program that satisfies all examples
+        Args:
+            accumulate_programs: 是否累积所有历史程序（Part2 设为 True，Part1 保持 False）
         """
-    
         if not examples:
             raise ValueError("No examples provided")
         test_inputs = self.extract_test_inputs(examples)
-        cache: Dict[T, Any] = {}  # 用于存储程序的签名缓存
+        cache: Dict[T, Any] = {}
 
-        # 1. 生成初始终端程序（如基础形状：矩形、圆等）
+        # 1. 生成初始终端程序
         current_programs = self.generate_terminals(examples)
-    
-        # 2. 消除初始程序中的等价程序
-        unique_programs = list(self.eliminate_equivalents(
-            current_programs, test_inputs, cache, iteration=0
-        ))
-    
-        # 3. 检查初始程序中是否有满足条件的解
+        # 去重并检查初始程序
+        unique_programs = list(self.eliminate_equivalents(current_programs, test_inputs, cache, iteration=0))
         for program in unique_programs:
             if self.is_correct(program, examples):
-                return program  # 找到解，立即返回
+                return program
 
-        # 4. 迭代生长程序（最多 max_iterations 次）
+        # 2. 迭代生长：根据参数选择“累积程序”或“增量程序”
+        all_programs = unique_programs.copy()  # 累积所有有效程序（仅当 accumulate_programs=True 时使用）
         for iteration in range(1, max_iterations + 1):
-            # 基于当前程序生成更复杂的程序（应用操作：并集、交集等）
-            grown_programs = self.grow(unique_programs, examples)
-        
-            # 消除生长后的等价程序
-            new_unique_programs = list(self.eliminate_equivalents(
-                grown_programs, test_inputs, cache, iteration=iteration
-            ))
-        
-            # 检查新生成的程序是否有解
+            # 生长基础：Part2 用累积的所有程序，Part1 用上次的新程序（兼容原有逻辑）
+            grow_base = all_programs if accumulate_programs else unique_programs
+            grown_programs = self.grow(grow_base, examples)
+            
+            # 去重新程序
+            new_unique_programs = list(self.eliminate_equivalents(grown_programs, test_inputs, cache, iteration=iteration))
+            if not new_unique_programs:
+                break  # 无新程序，提前终止
+            
+            # 检查新程序是否正确
             for program in new_unique_programs:
                 if self.is_correct(program, examples):
-                    return program  # 找到解，立即返回
-        
-            # 更新当前程序集（合并历史程序，避免重复生长）
-            unique_programs += new_unique_programs
-            # 再次消除合并后的等价程序（可选，进一步减少冗余）
-            unique_programs = list(self.eliminate_equivalents(
-                unique_programs, test_inputs, cache, iteration=iteration
-            ))
+                    return program
+            
+            # 更新程序集：累积模式保留所有程序，非累积模式仅保留新程序（兼容 Part1）
+            if accumulate_programs:
+                all_programs += new_unique_programs
+                # 二次去重（避免累积重复）
+                all_programs = list(self.eliminate_equivalents(all_programs, test_inputs, cache, iteration=iteration))
+            else:
+                unique_programs = new_unique_programs
 
-        # 若达到最大迭代次数仍未找到解
         raise ValueError(f"No program found within {max_iterations} iterations")
     
     '''
@@ -152,26 +145,25 @@ class BottomUpSynthesizer(ABC, Generic[T]):
     def eliminate_equivalents(self, program_list: List[T], test_inputs: List[Any], 
                               cache: Dict[T, Any], iteration: int) -> Generator[T, None, Dict[T, Any]]:
         """
-        Eliminate equivalent programs while maintaining interpretation cache
-    
-        Yields:
-            Unique programs one at a time
-        
-        Returns:
-            Updated cache after processing all programs
+        增强版等价性消除：过滤空签名（无效程序），兼容 Part1
         """
         seen_signatures = set()  # 记录已出现的签名，用于去重
 
         for program in tqdm(program_list, desc=f"[Iteration {iteration}] Eliminating equivalents", unit="program"):
-            # 关键：无论程序是否已在缓存中，都重新计算并更新（确保不同对象被记录）
-            xs, ys = test_inputs[0]
-            signature = tuple(program.interpret(xs, ys))
-            cache[program] = signature  # 即使等价，不同对象也会被作为不同键存入
-        
-            if signature not in seen_signatures:
-                seen_signatures.add(signature)
-                yield program
-    
+            try:
+                # 调用 compute_signature 生成签名（Part1/Part2 各自实现，不影响）
+                signature = self.compute_signature(program, test_inputs)
+                cache[program] = signature  # 缓存签名
+                
+                # 过滤：跳过空签名（解释报错的无效程序）和已存在的签名
+                if signature is not None and signature not in seen_signatures:
+                    seen_signatures.add(signature)
+                    yield program
+            except Exception as e:
+                # 捕获程序解释异常，跳过无效程序（Part2 组合程序可能报错，Part1 不受影响）
+                cache[program] = None
+                continue
+
         return cache
 
     @abstractmethod

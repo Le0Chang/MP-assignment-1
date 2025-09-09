@@ -173,6 +173,8 @@ class StringSynthesizer(BottomUpSynthesizer[StringExpression]):
         if is_first_name_initial:
             fn = SplitThenTake(input_prog, StringLiteral(" "), 0)
             initial = ToUpper(Substring(fn, 0, 1))
+            if self.is_correct(initial, examples):
+                return [initial]
             target_programs.append(initial)
         if is_normalize_path:
             target_programs.append(Replace(input_prog, StringLiteral("\\"), StringLiteral("/")))
@@ -237,7 +239,7 @@ class StringSynthesizer(BottomUpSynthesizer[StringExpression]):
                 print("Error:", target, e)
 
         # ----- 剪枝：只对基础 terminal/常见表达式生成变体 -----
-        max_program_count = 2000
+        max_program_count = 3000
         base_programs = program_list[:max_program_count]
 
         for base in base_programs:

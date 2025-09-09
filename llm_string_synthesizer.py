@@ -110,6 +110,7 @@ class LLMStringSynthesizer:
 
             raise ValueError(f"Failed to synthesize program: {str(e)}")
     
+    '''
     def generate_prompt(self, examples: List[Tuple[str, str]]) -> str:
         """
         Create a comprehensive prompt template for the LLM including DSL description and examples
@@ -127,7 +128,34 @@ class LLMStringSynthesizer:
         #####################################################################################################
 
         return "Please write a program"
-    
+    '''
+
+    def generate_prompt(self, examples: List[Tuple[str, str]]) -> str:
+        dsl_description = """
+    You are to synthesize a string processing program using the following DSL:
+    - InputString(): refers to the input string
+    - StringLiteral(value): creates a literal string
+    - Concatenate(a, b): concatenates two strings
+    - Substring(a, start, end): substring of a from start to end (Python-like slicing)
+    - ToUpper(a): converts a to upper case
+    - ToLower(a): converts a to lower case
+    - Replace(a, old, new): replaces all occurrences of old in a with new
+    - Strip(a): trims whitespace at both ends of a
+    - Repeat(a, n): repeats a for n times
+    - SplitThenTake(a, delim, idx): splits a by delim and takes piece idx
+    - Capitalize(a): capitalizes a (first letter upper, rest lower)
+    (You may use nested calls. Only output an expression in this DSL.)
+
+    Examples for the specific task:
+    """
+        example_lines = []
+        for inp, out in examples:
+            example_lines.append(f'Input: "{inp}"   Output: "{out}"')
+        prompt = dsl_description + "\n".join(example_lines)
+        prompt += "\nYour output:"
+        return prompt
+
+    '''
     def extract_program(self, response_text: str) -> StringExpression:
         """
         Extract the program from LLM response and evaluate it to get StringExpression object
@@ -145,6 +173,32 @@ class LLMStringSynthesizer:
         #####################################################################################################
 
         return StringLiteral("Dummy program")
+    '''
+
+    def extract_program(self, response: str) -> StringExpression:
+        import re
+        from strings import StringExpression, StringLiteral, InputString, Concatenate, Substring, ToUpper, ToLower, Replace, Strip, Repeat, SplitThenTake, Capitalize
+        # 提取第一个合法DSL表达式（可改进为更严格正则）
+        code_line = None
+        # 保守找第一行有"InputString"等关键字的行
+        for line in response.strip().splitlines():
+            if any(k in line for k in ["InputString", "Concatenate", "Substring", "ToUpper",
+                                    "ToLower", "Replace", "Strip", "Repeat", "SplitThenTake", "Capitalize"]):
+                code_line = line.strip()
+                break
+        if code_line is None:
+            raise ValueError("No recognizable DSL code found in LLM response")
+        # eval时限定全局，只允许你的DSL类
+        context = {
+            'StringLiteral': StringLiteral, 'InputString': InputString, 'Concatenate': Concatenate,
+            'Substring': Substring, 'ToUpper': ToUpper, 'ToLower': ToLower, 'Replace': Replace,
+            'Strip': Strip, 'Repeat': Repeat, 'SplitThenTake': SplitThenTake, 'Capitalize': Capitalize
+        }
+        try:
+            program = eval(code_line, context)
+        except Exception as e:
+            raise ValueError(f"Failed to parse LLM code: {code_line}") from e
+        return program
     
     def validate_program(self, program: StringExpression, examples: List[Tuple[str, str]]) -> bool:
         """
